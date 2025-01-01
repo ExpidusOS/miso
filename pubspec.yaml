@@ -44,6 +44,3 @@ flutter:
         pluginClass: MisoPlugin
       windows:
         pluginClass: MisoPlugin
-      web:
-        pluginClass: MisoPlugin
-        fileName: miso_web.dart
