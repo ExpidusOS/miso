@@ -2,6 +2,10 @@
 
 #include <flutter_linux/flutter_linux.h>
 
+struct _MisoApplication {
+  FlApplication parent_instance;
+};
+
 G_DECLARE_FINAL_TYPE(MisoApplication, miso_application, MISO, APPLICATION, FlApplication)
 
 /**

@@ -5,14 +5,13 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
-struct _MisoApplication {
-  FlApplication parent_instance;
+typedef struct _MisoApplicationPrivate {
   gchar** dart_entrypoint_arguments;
   int monitor_added_id;
   int monitor_removed_id;
-};
+} MisoApplicationPrivate;
 
-G_DEFINE_TYPE(MisoApplication, miso_application, fl_application_get_type())
+G_DEFINE_TYPE_WITH_PRIVATE(MisoApplication, miso_application, fl_application_get_type())
 
 static void first_frame_cb(MisoApplication* self, FlView* view) {
   GtkWidget* window = gtk_widget_get_toplevel(GTK_WIDGET(view));
@@ -24,6 +23,8 @@ static void first_frame_cb(MisoApplication* self, FlView* view) {
 }
 
 static void miso_application_monitor_added(GdkDisplay* display, GdkMonitor* monitor, MisoApplication* self) {
+  MisoApplicationPrivate* priv = (MisoApplicationPrivate*)miso_application_get_instance_private(self);
+
   FlView* view = nullptr;
   GList* windows = gtk_application_get_windows(GTK_APPLICATION(self));
   if (windows != nullptr) {
@@ -37,7 +38,7 @@ static void miso_application_monitor_added(GdkDisplay* display, GdkMonitor* moni
   } else {
     g_autoptr(FlDartProject) project = fl_dart_project_new();
     fl_dart_project_set_dart_entrypoint_arguments(
-      project, self->dart_entrypoint_arguments);
+      project, priv->dart_entrypoint_arguments);
 
     view = fl_view_new(project);
   }
@@ -51,14 +52,27 @@ static void miso_application_monitor_added(GdkDisplay* display, GdkMonitor* moni
   g_assert(window != nullptr);
 
   gtk_widget_realize(GTK_WIDGET(view));
-  shoyu_shell_gtk_monitor_set_window(monitor, gtk_widget_get_window(GTK_WIDGET(window)));
+  g_object_set(window, "monitor", monitor, nullptr);
 
   g_signal_emit_by_name(self, "register-plugins", FL_PLUGIN_REGISTRY(view));
 
   if (windows != nullptr) gtk_window_present(window);
 }
 
-static void miso_application_monitor_removed(GdkDisplay* display, GdkMonitor* monitor, MisoApplication* self) {}
+static void miso_application_monitor_removed(GdkDisplay* display, GdkMonitor* monitor, MisoApplication* self) {
+  GList* windows = gtk_application_get_windows(GTK_APPLICATION(self));
+
+  for (GList* item = windows; item != nullptr; item = item->next) {
+    MisoWindow* win = MISO_WINDOW(item->data);
+
+    GdkMonitor* win_monitor = nullptr;
+    g_object_get(win, "monitor", &win_monitor, nullptr);
+
+    if (win_monitor != monitor) break;
+
+    g_object_unref(win);
+  }
+}
 
 static void miso_application_register_plugins(FlApplication* app, FlPluginRegistry* registry) {
   (void)app;
@@ -72,13 +86,14 @@ static GtkWindow* miso_application_create_window(FlApplication* app, FlView* vie
 
 static void miso_application_activate(GApplication* application) {
   MisoApplication* self = MISO_APPLICATION(application);
+  MisoApplicationPrivate* priv = (MisoApplicationPrivate*)miso_application_get_instance_private(self);
 
   gtk_init(NULL, NULL);
   shoyu_shell_gtk_init();
 
   GdkDisplay* display = gdk_display_get_default();
-  self->monitor_added_id = g_signal_connect(display, "monitor-added", G_CALLBACK(miso_application_monitor_added), self);
-  self->monitor_removed_id = g_signal_connect(display, "monitor-removed", G_CALLBACK(miso_application_monitor_removed), self);
+  priv->monitor_added_id = g_signal_connect(display, "monitor-added", G_CALLBACK(miso_application_monitor_added), self);
+  priv->monitor_removed_id = g_signal_connect(display, "monitor-removed", G_CALLBACK(miso_application_monitor_removed), self);
 
   for (int i = 0; i < gdk_display_get_n_monitors(display); i++) {
     miso_application_monitor_added(display, gdk_display_get_monitor(display, i), self);
@@ -89,8 +104,9 @@ static gboolean miso_application_local_command_line(GApplication* application,
                                                 gchar*** arguments,
                                                 int* exit_status) {
   MisoApplication* self = MISO_APPLICATION(application);
+  MisoApplicationPrivate* priv = (MisoApplicationPrivate*)miso_application_get_instance_private(self);
 
-  self->dart_entrypoint_arguments = g_strdupv(*arguments + 1);
+  priv->dart_entrypoint_arguments = g_strdupv(*arguments + 1);
 
   g_autoptr(GError) error = nullptr;
   if (!g_application_register(application, nullptr, &error)) {
@@ -109,8 +125,9 @@ static gboolean miso_application_local_command_line(GApplication* application,
 
 static void miso_application_dispose(GObject* object) {
   MisoApplication* self = MISO_APPLICATION(object);
+  MisoApplicationPrivate* priv = (MisoApplicationPrivate*)miso_application_get_instance_private(self);
 
-  g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
+  g_clear_pointer(&priv->dart_entrypoint_arguments, g_strfreev);
 
   G_OBJECT_CLASS(miso_application_parent_class)->dispose(object);
 }
