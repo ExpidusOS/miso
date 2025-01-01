@@ -56,6 +56,8 @@ static void miso_window_constructed(GObject* object) {
 
   gtk_widget_map(GTK_WIDGET(self->view));
   gtk_widget_grab_focus(GTK_WIDGET(self->view));
+
+  gtk_window_set_decorated(GTK_WINDOW(self), FALSE);
 }
 
 static void miso_window_dispose(GObject* object) {

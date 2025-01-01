@@ -40,18 +40,20 @@ static void miso_application_monitor_added(GdkDisplay* display, GdkMonitor* moni
       project, self->dart_entrypoint_arguments);
 
     view = fl_view_new(project);
-    g_signal_connect_swapped(view, "first-frame", G_CALLBACK(first_frame_cb), self);
   }
 
+  g_assert(view != nullptr);
+  g_signal_connect_swapped(view, "first-frame", G_CALLBACK(first_frame_cb), self);
   gtk_widget_show(GTK_WIDGET(view));
 
   GtkWindow* window = nullptr;
-  g_signal_emit_by_name(self, "create-window", 0, view, &window);
+  g_signal_emit_by_name(self, "create-window", view, &window);
+  g_assert(window != nullptr);
 
   gtk_widget_realize(GTK_WIDGET(view));
   shoyu_shell_gtk_monitor_set_window(monitor, gtk_widget_get_window(GTK_WIDGET(window)));
 
-  g_signal_emit_by_name(self, "register-plugins", 0, FL_PLUGIN_REGISTRY(view));
+  g_signal_emit_by_name(self, "register-plugins", FL_PLUGIN_REGISTRY(view));
 
   if (windows != nullptr) gtk_window_present(window);
 }

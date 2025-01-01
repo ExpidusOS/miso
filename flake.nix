@@ -2,11 +2,12 @@
   description = "A compositor framework for Flutter";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+    flutter-327-nixpkgs.url = "github:NixOS/nixpkgs?ref=pull/365302/head";
     systems.url = "github:nix-systems/default-linux";
     flake-utils.url = "github:numtide/flake-utils";
     nixos-apple-silicon = {
-      url = "github:tpwrules/nixos-apple-silicon/release-2024-11-12";
+      url = "github:tpwrules/nixos-apple-silicon/release-2024-12-25";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shoyu = {
@@ -24,6 +25,7 @@
     {
       self,
       nixpkgs,
+      flutter-327-nixpkgs,
       systems,
       flake-utils,
       nixos-apple-silicon,
@@ -41,10 +43,13 @@
 
           packages = with pkgs; [
             pkgs.shoyu
-            flutter327
+            flutterPackages-source.v3_27
             pkg-config
             gtk3
             yq
+            cmake
+            ninja
+            llvmPackages.clang
           ];
         };
     in
@@ -59,12 +64,18 @@
                   pkgs.appendOverlays [
                     nixos-apple-silicon.overlays.default
                     (pkgsAsahi: prev: {
-                      mesa = pkgsAsahi.mesa-asahi-edge;
+                      mesa = pkgsAsahi.mesa-asahi-edge.overrideAttrs (f: p: {
+                        meta.platforms = prev.mesa.meta.platforms;
+                      });
                     })
                   ]
                 else
                   null
               );
+
+              flutterPackages-source = pkgs.callPackage "${flutter-327-nixpkgs}/pkgs/development/compilers/flutter" {
+                useNixpkgsEngine = true;
+              };
             }
           )
           shoyu.overlays.default
